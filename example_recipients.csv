@@ -1,0 +1,2 @@
+Email,Name,Role,Subject,Body,Attachment1,CC
+byanjiong@gmail.com,Boo ,Manager,Project Update,"<p>Hi {{ Name }},</p><p>Here is the update for your role as <b>{{ Role }}</b>.</p>",,

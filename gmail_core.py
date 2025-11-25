@@ -26,7 +26,7 @@ SCOPES = [
 ]
 
 # Default Configs (Can be overridden by arguments)
-TRACKING_URL_BASE = "http://YOUR_APACHE_SERVER_IP_OR_DOMAIN/tracker.php"
+TRACKING_URL_BASE = "https://your-domain.com/tracker/tracker.php"
 HISTORY_FILE = "sent_history.log"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
