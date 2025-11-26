@@ -1,0 +1,26 @@
+# ----------------------------------------------------------------------
+# SECURITY HEADERS
+# ----------------------------------------------------------------------
+
+# 1. Disable Directory Browsing
+# Prevents users from seeing a list of files if they visit the folder URL
+Options -Indexes
+
+# 2. Block Access to Sensitive Files
+# Deny web access to JSON (creds), Python (code), Logs, and Text files
+<FilesMatch "\.(json|py|log|txt|md|gitignore|env)$">
+    # Apache 2.4 syntax
+    Require all denied
+    
+    # Apache 2.2 syntax (Fallback)
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# 3. Block Access to Hidden Files (starting with dot)
+# except for .htaccess itself (which is blocked by default usually)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
