@@ -1,170 +1,149 @@
-# **Gmail Tracking & Sending System \- Setup Guide**
+# **Gmail Tracking & Sending System**
 
-This system allows you to send bulk or transactional emails via the Gmail API (or Google Sheets) with open tracking capabilities. It includes a PHP script for the server side (tracking) and Python scripts for the client side (sending).
+This system allows you to send bulk, personalized emails via the Gmail API with open tracking capabilities. It features a **Web Dashboard** for easy management, log viewing, and token handling, alongside robust Python backend scripts.
 
-## **Part 1: Apache Server Setup (Tracking)**
+## **📂 Project Structure**
 
-This part sets up the "pixel" that tracks when emails are opened.
+Ensure your server folder looks like this:
 
-1. Create Folder Structure:  
-   On your server (e.g., inside /var/www/html/), you need 3 specific folders:  
-   * ui/ (User Interface)  
-   * log/ (For storing logs)  
-   * tracker/ (For the PHP script)  
-2. Upload the Script:  
-   Upload tracker.php inside the tracker/ folder.  
-3. Permissions (CRITICAL):  
-   The script needs to write to the log folder (which is one level up from the tracker). You must give write permissions to the web server user (usually www-data) for the log directory.  
-   Run these commands on your server terminal:  
-   cd /var/www/html
+```text
+/your-project-folder/
+├── credentials.json       (Uploaded via UI)
+├── token.json             (Uploaded via UI)
+├── logger_config.py       (Global logging setup)
+├── gmail_core.py          (Main logic & API handling)
+├── auth.py                (Local auth tool)
+├── list_sheets.py         (Helper for UI dropdown)
+├── send_csv.py            (CLI: Send from CSV)
+├── send_googlesheet.py    (CLI: Send from Sheets)
+├── send_one.py            (CLI: Send single email)
+├── .gitignore
+├── log/                   (Writable by Web Server)
+│   ├── process.log
+│   ├── sent_history.log
+│   └── track_history.log
+├── tracker/
+│   └── tracker.php        (The tracking pixel)
+└── ui/
+    └── index.php          (The Dashboard)
+````
 
-   \# 1\. Create the structure  
-   mkdir \-p ui log tracker
+## **Part 1: Google Cloud Setup (Critical)**
 
-   \# 2\. Set ownership to the Apache user (usually www-data)  
-   sudo chown \-R www-data:www-data log
+Before installing the software, you must set up your Google Cloud Project correctly to avoid token expiration issues.
 
-   \# 3\. Grant write permissions  
-   sudo chmod \-R 775 log
+1.  **Create Project:** Go to [Google Cloud Console](https://console.cloud.google.com/) and create a project.
+2.  **Enable APIs:** Enable **Gmail API**, **Google Sheets API**, and **Google Drive API**.
+3.  **Configure OAuth Consent Screen:**
+      * User Type: **External**.
+      * **IMPORTANT - PUBLISH YOUR APP:**
+          * By default, your app is in **"Testing"** mode. Tokens generated in Testing mode **expire after 7 days**.
+          * To fix this: Go to **OAuth consent screen** \> Click **PUBLISH APP** (Push to Production).
+          * *Note:* You do not need to submit for verification. Just publishing it is enough to make the token permanent.
+4.  **Create Credentials:**
+      * Go to **Credentials** \> **Create Credentials** \> **OAuth Client ID**.
+      * Type: **Desktop App**.
+      * Download the JSON file and rename it to `credentials.json`.
 
-4. **Test It:**  
-   * Visit http://your-server-ip/tracker/tracker.php?user=test in your browser.  
-   * You should see a 1x1 blank pixel (essentially a blank page).  
-   * Check the log on the server: cat /var/www/html/log/opens.log. You should see the entry.
+## **Part 2: Server Installation**
 
-## **Part 2: Python Sender Setup (Local Computer)**
+1.  **Install Requirements:**
 
-*You must do this part on your local computer first to generate the authentication token.*
+    ```bash
+    sudo apt-get update
+    sudo apt-get install python3 python3-pip
+    pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+    ```
 
-1. Create a Virtual Environment (Recommended):  
-   It is best practice to run this in an isolated environment.  
-   \# Create the venv  
-   python3 \-m venv venv
+2.  **Upload Files:** Upload the scripts to your web server (e.g., `/var/www/html/gmail-sender/`).
 
-   \# Activate it (Mac/Linux)  
-   source venv/bin/activate
+3.  **Set Permissions (Crucial):**
+    The web server (usually `www-data`) needs to write to the `log` folder and upload JSON files.
 
-   \# Activate it (Windows)  
-   \# venv\\Scripts\\activate
+    ```bash
+    cd /var/www/html/gmail-sender
 
-2. Install Libraries:  
-   With the venv activated:  
-   pip install \--upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+    # Create folders if they don't exist
+    mkdir -p log
 
-3. **Enable APIs in Google Cloud:**  
-   * Go to [Google Cloud Console](https://console.cloud.google.com/).  
-   * Create a project (or select one).  
-   * Enable **Gmail API**.  
-   * Enable **Google Sheets API**.  
-4. **Configure OAuth Consent Screen (Crucial):**  
-   * Go to **APIs & Services** \> **OAuth consent screen**.  
-   * Select **External** (unless you are a G Suite admin) and click Create.  
-   * Fill in the App Name (e.g., "Python Sender") and User Support Email.  
-   * **Test Users (Fix for Error 403):**  
-     * Scroll to the **Test users** section (or click "Audience" in the menu).  
-     * Click **\+ ADD USERS**.  
-     * **Enter your own email address** (the one you will use to send emails).  
-     * Click **Save**. *Without this, you will get an Access Denied error.*  
-5. **Get Credentials:**  
-   * Go to **Credentials** \> **Create Credentials** \> **OAuth client ID**.  
-   * Application Type: **Desktop App** (Do *not* select Web Application).  
-   * Click Create.  
-   * Download the JSON file.  
-   * Rename it to credentials.json.  
-   * Place it in the same folder as your Python scripts.  
-6. **Configure the Script:**  
-   * Open gmail\_core.py.  
-   * Find TRACKING\_URL\_BASE.  
-   * Update it to your actual server URL (e.g., http://your-server-ip/tracker/tracker.php).  
-7. **Run Once to Authenticate:**  
-   * Run the dedicated authentication script to generate your token.
+    # Grant ownership to web server
+    sudo chown -R www-data:www-data log
+    sudo chown www-data:www-data credentials.json token.json 2>/dev/null
 
-   python auth.py
+    # Grant write permissions
+    sudo chmod -R 775 log
+    sudo chmod 664 credentials.json token.json 2>/dev/null
+    ```
 
-   * A browser will open. Log in with your Google account.  
-   * **"Unverified App" Warning:** Since your app is in testing mode, Google will show a warning.  
-     * Click **Advanced** (or "Continue").  
-     * Click **"Go to \[App Name\] (unsafe)"**.  
-   * Allow the permissions. This generates a new file named token.json.
+## **Part 3: Authentication (The "Upload" Workflow)**
 
-## **Part 3: Deploying to Your Server**
+Since servers usually don't have browsers, we generate the token locally and upload it.
 
-Since servers usually don't have web browsers, you transfer the credentials you just created.
+1.  **On your Local Computer:**
 
-1. Prepare Server Environment:  
-   SSH into your server and set up the environment.  
-   sudo apt-get update  
-   sudo apt-get install python3 python3-pip python3-venv
+      * Install Python and the libraries (`pip install google-api-python-client...`).
+      * Place `auth.py` and `credentials.json` in a folder.
+      * Run: `python auth.py`
+      * A browser will open. **Login** with the Gmail account you want to send from.
+      * *Warning:* Since your app is unverified, Google will show a "This app isn't verified" warning. Click **Advanced** -\> **Go to [App Name] (unsafe)** to proceed.
+      * This generates a `token.json` file.
 
-   \# Create folder for your scripts  
-   mkdir email-sender  
-   cd email-sender
+2.  **On the Web Dashboard:**
 
-   \# Create and activate venv  
-   python3 \-m venv venv  
-   source venv/bin/activate
-
-   \# Install libraries inside venv  
-   pip install \--upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
-
-2. Upload Files:  
-   Upload all 7 files to the server folder (e.g., email-sender):  
-   * gmail\_core.py (Core logic & Auth)  
-   * auth.py (Authentication helper)  
-   * send\_csv.py (CSV Bulk sender)  
-   * sheet\_sender.py (Google Sheets sender)  
-   * send\_one.py (Single sender for forms)  
-   * credentials.json  
-   * token.json (The file generated in Part 2\)  
-3. Permissions:  
-   If using a PHP form handler to trigger these scripts, the web server user (www-data) needs read access.  
-   chmod 644 gmail\_core.py token.json credentials.json  
-   chmod 755 send\_one.py sheet\_sender.py send\_csv.py auth.py
-
-   Important Note for PHP Integration:  
-   When calling these scripts from PHP shell\_exec, you must use the Python executable inside the virtual environment, not the system python.  
-   *Example PHP Command:*  
-   $command \= "/path/to/email-sender/venv/bin/python3 /path/to/email-sender/send\_one.py ...";
+      * Open `http://your-server/gmail-sender/ui/`
+      * Enter the password (Default: `123`).
+      * Go to the **Auth Setup** tab.
+      * Upload `credentials.json` (from Google Cloud).
+      * Upload `token.json` (generated from your computer).
+      * You are now ready to send\!
 
 ## **Part 4: Usage**
 
-### **A. Bulk Sending from CSV**
+### **Web Dashboard (Recommended)**
 
-1. Create a file named recipients.csv (see Data Format below).  
-2. Run:  
-   \# Option 1: Default (looks for 'recipients.csv')  
-   python send\_csv.py
+1.  **Select Sheet:** The UI automatically lists Google Sheets from your Drive (requires the `token.json` to have Drive permissions).
+2.  **Select Tab:** Optional. Defaults to the first tab.
+3.  **Start Sending:** The process runs in the background. You can see real-time logs and download a CSV report of sent emails.
 
-   \# Option 2: Specify a custom CSV file  
-   python send\_csv.py my\_list\_may.csv
+### **Command Line (Advanced/Cron)**
 
-   *Note:* The script respects the DAILY\_LIMIT set *in send\_csv.py. Run it daily to process large lists in chunks.*
+You can run these scripts manually via SSH:
 
-### **B. Sending from Google Sheets**
+```bash
+# Send from Google Sheet
+python3 send_googlesheet.py <SHEET_ID> [SHEET_NAME]
 
-1. Get your **Sheet ID** from the URL: docs.google.com/spreadsheets/d/THIS\_IS\_THE\_ID/edit.  
-2. Run:  
-   \# Option 1: Auto-detect data in the first sheet  
-   python sheet\_sender.py \<SHEET\_ID\>
+# Send from CSV file
+python3 send_csv.py recipients.csv
 
-   \# Option 2: Specify a specific sheet name  
-   python sheet\_sender.py \<SHEET\_ID\> "Sheet Name"
+# Send Single Email (Testing)
+python3 send_one.py recipient@example.com "John Doe"
+```
 
-### **C. Single Email (Programmatic Trigger)**
+## **Part 5: Tracking**
 
-Use this for website forms or system triggers.
+1.  **The Pixel:** The script automatically injects a 1x1 invisible image into every email body.
+2.  **Tracker Script:** Ensure `tracker/tracker.php` is accessible from the public internet (e.g., `https://your-domain.com/tracker/tracker.php`).
+3.  **Config:** Update `TRACKING_URL_BASE` in `gmail_core.py` to point to your actual domain.
 
-python send\_one.py recipient@example.com "Recipient Name"
+## **Troubleshooting**
 
-## **Advanced Data Format**
+### **Token Expired / Auth Errors**
 
-You can use these column headers in your CSV or Google Sheet. Headers are **case-insensitive**.
+  * **Symptom:** Logs show "invalid\_grant" or authentication failures after a week.
+  * **Cause:** Your Google Cloud App is likely still in **"Testing"** mode.
+  * **Fix:**
+    1.  Go to Google Cloud Console \> OAuth Consent Screen.
+    2.  Click **PUBLISH APP**.
+    3.  Delete old `token.json` on your computer.
+    4.  Run `python auth.py` again to generate a new token.
+    5.  Upload the new token via the Web UI.
 
-| Header | Description |
-| :---- | :---- |
-| **Email** | **Required**. The primary recipient address. (Can also use "To"). |
-| **CC** | Optional. CC recipient(s). |
-| **BCC** | Optional. BCC recipient(s). |
-| **Subject** | Optional. Overrides the default subject. Supports merge tags {{ name }}. |
-| **Body** | Optional. Overrides the default HTML body. Supports merge tags. |
+### **PHP Timeouts**
 
+  * **Symptom:** Sending stops after exactly 30 seconds or \~20-30 emails.
+  * **Fix:** The `ui/index.php` script includes `set_time_limit(0)` to prevent this. Ensure your server allows this override (check `php.ini` for `disable_functions`).
+
+<!-- end list -->
+
+```
