@@ -24,10 +24,11 @@ from email import encoders
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/spreadsheets.readonly',
-    'https://www.googleapis.com/auth/drive.metadata.readonly' # <--- NEW SCOPE ADDED
+    'https://www.googleapis.com/auth/drive.metadata.readonly'
 ]
 
 # Configs
+ENABLE_TRACKING = True
 TRACKING_URL_BASE = "https://your-domain.com/tracker/tracker.php" # CHANGE THIS
 HISTORY_FILENAME = "sent_history.log"
 
@@ -176,7 +177,7 @@ def process_bulk_email(data_source_list, daily_limit=450):
         if not validate_recipients(data): continue
 
         primary_email = data.get('email') or data.get('to')
-        if primary_email and primary_email in sent_history: continue
+        # if primary_email and primary_email in sent_history: continue
         if session_count >= daily_limit:
             logging.warning(f"Daily limit of {daily_limit} reached.")
             break
@@ -197,8 +198,8 @@ def process_bulk_email(data_source_list, daily_limit=450):
         final_subject = replace_placeholders(raw_subject, data)
         final_body = replace_placeholders(raw_body, data)
         
-        if 'tracker.php' not in final_body:
-            pixel = f'<img src="{tracker}" width="1" height="1" style="display:none;" />'
+        if ENABLE_TRACKING and 'tracker.php' not in final_body:
+            pixel = f'<img src="{tracker}" width="1" height="1"/>'
             final_body = final_body.replace('</body>', f'{pixel}</body>') if '</body>' in final_body else final_body + pixel
 
         files, _ = extract_attachments(data)
