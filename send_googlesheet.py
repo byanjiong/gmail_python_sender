@@ -27,7 +27,7 @@ def list_recent_sheets(limit=100):
     """Fetches recent Google Sheets using Drive API."""
     try:
         creds = get_credentials()
-        service = build('drive', 'v3', credentials=creds)
+        service = build('drive', 'v3', credentials=creds, cache_discovery=False)
         
         query = "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
         

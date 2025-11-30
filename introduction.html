@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail API Flowchart</title>
+    <!-- Import Mermaid Library -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100vw; 
+            height: 100vh; 
+            background: #ffffff; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            overflow: hidden; 
+            font-family: sans-serif;
+        }
+        
+        h1 {
+            position: absolute;
+            top: 10px;
+            left: 20px;
+            margin: 0;
+            font-size: 1.2rem;
+            color: #555;
+            background: rgba(255,255,255,0.8);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+
+        .mermaid { 
+            width: 95vw; 
+            height: 85vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+        }
+        
+        /* Force the internal SVG to scale to the container */
+        .mermaid svg {
+            height: 100% !important;
+            width: 100% !important; 
+        }
+
+        button {
+            position: absolute;
+            bottom: 30px;
+            background-color: #0d6efd; 
+            color: white; 
+            border: none; 
+            padding: 12px 24px;
+            font-size: 16px; 
+            border-radius: 50px; 
+            cursor: pointer; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+            z-index: 100;
+        }
+        button:hover { 
+            background-color: #0b5ed7; 
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Gmail API Sending Flow</h1>
+    
+    <!-- The Mermaid Diagram Definition -->
+    <div class="mermaid" id="diagram">
+graph TD
+    %% Nodes
+    User((User))
+    Script[Python Script<br>gmail_core.py]
+    Creds[credentials.json<br>App Identity]
+    Token[token.json<br>User Access Key]
+    GoogleAuth[Google OAuth Server]
+    Gmail[Gmail API Service]
+
+    %% Styles
+    style User fill:#f9f,stroke:#333,stroke-width:2px
+    style Script fill:#ff9,stroke:#333,stroke-width:2px
+    style Gmail fill:#9f9,stroke:#333,stroke-width:2px
+    style GoogleAuth fill:#9cf,stroke:#333,stroke-width:2px
+
+    %% Flow
+    User -- 1. Runs command --> Script
+    
+    subgraph "Local Server / Computer"
+        Script
+        Creds
+        Token
+    end
+
+    subgraph "Google Cloud Platform"
+        GoogleAuth
+        Gmail
+    end
+
+    %% Auth Flow
+    Script -- "2. Reads (Client ID)" --> Creds
+    Script -- "3. Checks for valid key" --> Token
+    
+    %% If token is missing/expired
+    Script -. "4. If no Token: Request Auth" .-> GoogleAuth
+    GoogleAuth -. "5. Returns New Token" .-> Script
+    Script -. "6. Saves New Token" .-> Token
+
+    %% Sending Flow
+    Script -- "7. Send Email Request + Token" --> Gmail
+    Gmail -- "8. Delivers Email" --> User
+    </div>
+
+    <button onclick="downloadSVG()">Download Full Scale PNG</button>
+
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+
+        function downloadSVG() {
+            const svg = document.querySelector("#diagram svg");
+            if (!svg) {
+                alert("Diagram not fully loaded yet.");
+                return;
+            }
+
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svg);
+            
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            const img = new Image();
+            
+            // Get original dimensions from SVG viewbox or bounding client rect
+            // We multiply by 3 for high resolution
+            const svgData = svg.getBoundingClientRect();
+            const scaleFactor = 3;
+            
+            canvas.width = svgData.width * scaleFactor;
+            canvas.height = svgData.height * scaleFactor;
+            
+            // Convert SVG string to Base64
+            const svgBlob = new Blob([svgString], {type: "image/svg+xml;charset=utf-8"});
+            const url = URL.createObjectURL(svgBlob);
+            
+            img.onload = function() {
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.scale(scaleFactor, scaleFactor); // Scale context
+                ctx.drawImage(img, 0, 0, svgData.width, svgData.height);
+                
+                // Trigger download
+                const pngUrl = canvas.toDataURL("image/png");
+                const downloadLink = document.createElement("a");
+                downloadLink.href = pngUrl;
+                downloadLink.download = "gmail_flowchart_full.png";
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                URL.revokeObjectURL(url);
+            };
+            
+            img.src = url;
+        }
+    </script>
+</body>
+</html>

@@ -31,11 +31,13 @@ SCOPES = [
 ENABLE_TRACKING = True
 TRACKING_URL_BASE = "https://your-domain.com/tracker/tracker.php" # CHANGE THIS
 HISTORY_FILENAME = "sent_history.log"
+FAILED_FILENAME = "failed_history.log"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TOKEN_PATH = os.path.join(BASE_DIR, 'token.json')
 CREDENTIALS_PATH = os.path.join(BASE_DIR, 'credentials.json')
 HISTORY_PATH = os.path.join(BASE_DIR, 'log', HISTORY_FILENAME)
+FAILED_PATH = os.path.join(BASE_DIR, 'log', FAILED_FILENAME)
 
 def get_credentials():
     creds = None
@@ -59,10 +61,10 @@ def get_credentials():
     return creds
 
 def get_gmail_service():
-    return build('gmail', 'v1', credentials=get_credentials())
+    return build('gmail', 'v1', credentials=get_credentials(), cache_discovery=False)
 
 def get_sheets_service():
-    return build('sheets', 'v4', credentials=get_credentials())
+    return build('sheets', 'v4', credentials=get_credentials(), cache_discovery=False)
 
 def replace_placeholders(text, data_dict):
     if not text: return ""
@@ -156,6 +158,25 @@ def log_sent_email(data_source, body_content, attachment_count):
     except Exception as e:
         logging.error(f"Failed to write to sent history: {e}")
 
+def log_failed_email(data_source, error_msg):
+    """
+    Logs failed attempts to log/failed_history.log
+    Format: Timestamp ‡ Email ‡ Error Message
+    """
+    try:
+        os.makedirs(os.path.dirname(FAILED_PATH), exist_ok=True)
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        email = data_source.get('email') or data_source.get('to') or 'unknown'
+        
+        # Sanitize error message to fit on one line
+        clean_error = str(error_msg).replace('\n', ' ').replace('\r', '').replace('‡', '|')
+        
+        entry = f"{now}‡{email}‡{clean_error}\n"
+        with open(FAILED_PATH, 'a', encoding='utf-8') as f:
+            f.write(entry)
+    except Exception as e:
+        logging.error(f"Failed to write to failed history: {e}")
+
 def process_bulk_email(data_source_list, daily_limit=450):
     logs = [] 
     if not data_source_list:
@@ -213,6 +234,10 @@ def process_bulk_email(data_source_list, daily_limit=450):
             time.sleep(1.5)
         except HttpError as error:
             logging.error(f"Error sending to {primary_email}: {error}")
+            log_failed_email(data, error)
+        except Exception as e:
+            logging.error(f"Unexpected error for {primary_email}: {e}")
+            log_failed_email(data, e)
 
     logging.info(f"Batch complete. Sent {session_count} emails.")
     return logs

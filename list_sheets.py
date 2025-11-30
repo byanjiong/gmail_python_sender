@@ -12,7 +12,7 @@ def list_spreadsheets():
         if not creds:
             return json.dumps({"error": "No credentials found"})
 
-        service = build('drive', 'v3', credentials=creds)
+        service = build('drive', 'v3', credentials=creds, cache_discovery=False)
         
         # Query for Google Sheets mimeType and not in trash
         query = "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
